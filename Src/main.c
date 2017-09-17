@@ -49,7 +49,17 @@
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
+#define I2C_ADDRESS        0x90
+
 /* Private variables ---------------------------------------------------------*/
+/* I2C handler declaration */
+I2C_HandleTypeDef I2cHandle;
+
+/* Buffer used for transmission */
+uint8_t aTxBuffer[] = " ****I2C_TwoBoards communication based on IT****  ****I2C_TwoBoards communication based on IT****  ****I2C_TwoBoards communication based on IT**** ";
+
+/* Buffer used for reception */
+uint8_t aRxBuffer[512];
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void Error_Handler(void);
@@ -63,7 +73,9 @@ static void Error_Handler(void);
   */
 int main(void)
 {
-
+  volatile float temp = 0.0;	/* Temperature */
+  volatile float thyst = 0.0;	/* Hysteresis register default 75deg C */
+  volatile float tos = 0.0;	/* Overtemperature shutdown default 80deg C */
   /* STM32F4xx HAL library initialization:
        - Configure the Flash prefetch, Flash preread and Buffer caches
        - Systick timer is configured by default as source of time base, but user 
@@ -75,17 +87,94 @@ int main(void)
      */
   HAL_Init();
   
+  /* Configure LED2 */
+  BSP_LED_Init(LED2);
+
   /* Configure the System clock to 84 MHz */
   SystemClock_Config();
   
+  /*##-1- Configure the I2C peripheral ######################################*/
+  I2cHandle.Instance             = I2Cx;
 
-  /* Add your application code here
-     */
+  I2cHandle.Init.AddressingMode  = I2C_ADDRESSINGMODE_7BIT;
+  I2cHandle.Init.ClockSpeed      = 100000;
+  I2cHandle.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  I2cHandle.Init.DutyCycle       = I2C_DUTYCYCLE_16_9;
+  I2cHandle.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  I2cHandle.Init.NoStretchMode   = I2C_NOSTRETCH_DISABLE;
+  I2cHandle.Init.OwnAddress1     = 0;
+  I2cHandle.Init.OwnAddress2     = 0xFE;
 
+  if(HAL_I2C_Init(&I2cHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    Error_Handler();
+  }
 
   /* Infinite loop */
   while (1)
-  {    
+  {
+	  /*##-4- Put I2C peripheral in reception process ############################*/
+	  do
+	  {
+	    if(HAL_I2C_Mem_Read_IT(&I2cHandle, (uint16_t)I2C_ADDRESS, 0, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&aRxBuffer[0], 2) != HAL_OK)
+	    {
+	      /* Error_Handler() function is called in case of error. */
+	      Error_Handler();
+	    }
+
+	    /* When Acknowledge failure occurs (Slave don't acknowledge its address)
+	    Master restarts communication */
+	  }
+	  while(HAL_I2C_GetError(&I2cHandle) == HAL_I2C_ERROR_AF);
+
+	  while (HAL_I2C_GetState(&I2cHandle) != HAL_I2C_STATE_READY)
+	  {
+	  }
+//	  HAL_Delay(500);
+	  temp = 0.125*(aRxBuffer[0]*8.0+ (aRxBuffer[1]>>5));
+
+	  /*##-4- Put I2C peripheral in reception process ############################*/
+	  do
+	  {
+	    if(HAL_I2C_Mem_Read_IT(&I2cHandle, (uint16_t)I2C_ADDRESS, 2, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&aRxBuffer[2], 2) != HAL_OK)
+	    {
+	      /* Error_Handler() function is called in case of error. */
+	      Error_Handler();
+	    }
+
+	    /* When Acknowledge failure occurs (Slave don't acknowledge its address)
+	    Master restarts communication */
+	  }
+	  while(HAL_I2C_GetError(&I2cHandle) == HAL_I2C_ERROR_AF);
+
+	  while (HAL_I2C_GetState(&I2cHandle) != HAL_I2C_STATE_READY)
+	  {
+	  }
+//	  HAL_Delay(500);
+	  thyst = 0.125*(aRxBuffer[2]*8.0+ (aRxBuffer[3]>>5));
+
+	  /*##-4- Put I2C peripheral in reception process ############################*/
+	  do
+	  {
+	    if(HAL_I2C_Mem_Read_IT(&I2cHandle, (uint16_t)I2C_ADDRESS, 3, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&aRxBuffer[4], 2) != HAL_OK)
+	    {
+	      /* Error_Handler() function is called in case of error. */
+	      Error_Handler();
+	    }
+
+	    /* When Acknowledge failure occurs (Slave don't acknowledge its address)
+	    Master restarts communication */
+	  }
+	  while(HAL_I2C_GetError(&I2cHandle) == HAL_I2C_ERROR_AF);
+
+	  while (HAL_I2C_GetState(&I2cHandle) != HAL_I2C_STATE_READY)
+	  {
+	  }
+	  tos = 0.125*(aRxBuffer[4]*8.0+ (aRxBuffer[5]>>5));
+	  BSP_LED_Toggle(LED2);
+	  HAL_Delay(500);
+
   }
 }
 
